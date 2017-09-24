@@ -277,7 +277,7 @@ class ArgParser(argparse.ArgumentParser):
 
 class FuncDiffInfo(object):
     """
-    An object stores one candidate python code compare to referenced python code result.
+    An object stores the result of candidate python code compared to referenced python code.
     """
 
     info_ref = None
