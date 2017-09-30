@@ -106,14 +106,27 @@ class FuncNodeCollector(ast.NodeTransformer):
         return node
 
     def visit_Compare(self, node):
-        # Eq simple case normalized
-        if node.ops and len(node.ops) == 1 and type(node.ops[0]).__name__ == 'Eq':
-            if node.left and node.comparators and len(node.comparators) == 1:
-                left, right = node.left, node.comparators[0]
-                if cmp(type(left).__name__, type(right).__name__) > 0:
-                    left, right = right, left
-                    node.left = left
-                    node.comparators = [right]
+
+        def _simple_nomalize(*ops_type_names):
+            if node.ops and len(node.ops) == 1 and type(node.ops[0]).__name__ in ops_type_names:
+                if node.left and node.comparators and len(node.comparators) == 1:
+                    left, right = node.left, node.comparators[0]
+                    if cmp(type(left).__name__, type(right).__name__) > 0:
+                        left, right = right, left
+                        node.left = left
+                        node.comparators = [right]
+                        return True
+            return False
+
+        if _simple_nomalize('Eq'):
+            pass
+
+        if _simple_nomalize('Gt', 'Lt'):
+            node.ops = [{ast.Lt: ast.Gt, ast.Gt: ast.Lt}[type(node.ops[0])]()]
+
+        if _simple_nomalize('GtE', 'LtE'):
+            node.ops = [{ast.LtE: ast.GtE, ast.GtE: ast.LtE}[type(node.ops[0])]()]
+
         self.generic_visit(node)
         return node
 
