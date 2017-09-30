@@ -339,7 +339,7 @@ def detect(pycode_string_list):
             for fi2 in func_info_candidate:
                 dv = unified_diff(fi1.func_ast_lines, fi2.func_ast_lines)
                 counter = collections.Counter(dv)
-                if counter['-'] + counter['+'] < min_diff_line_count:
+                if counter['-'] < min_diff_line_count:
                     min_diff_line_count = counter['-']
                     min_diff_fi2 = fi2
 
