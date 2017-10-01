@@ -91,6 +91,32 @@ def bar(b):
             result = pycode_similar.detect([s1, s2])
             self.assertEqual(result[0][1][0].plagiarism_percent, 1)
 
+    def test_space_and_comments(self):
+            s1 = """
+def foo(a):
+    \"""
+    foo comments.
+    \"""
+    if a >= 1:
+        return True
+        
+    # this should return False    
+    return False
+            """
+            s2 = """
+def bar(b):
+# bar comments.
+    if 1 <= b:
+        \"""
+        This should
+        return True
+        \"""
+        return True
+    return False
+            """
+            result = pycode_similar.detect([s1, s2])
+            self.assertEqual(result[0][1][0].plagiarism_percent, 1)
+
 
 if __name__ == "__main__":
 #     import sys;sys.argv = ['', 'Test.test_reload_custom_code_after_changes_in_class']
