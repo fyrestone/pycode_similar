@@ -387,9 +387,9 @@ if __name__ == '__main__':
     parser.add_argument('files', type=file, nargs=2,
                         help='the input files')
     parser.add_argument('-l', type=check_line_limit, default=4,
-                        help='if AST line of the function >= value then output detail')
+                        help='if AST line of the function >= value then output detail (default: 4)')
     parser.add_argument('-p', type=check_percentage_limit, default=0.5,
-                        help='if plagiarism percentage of the function >= value then output detail')
+                        help='if plagiarism percentage of the function >= value then output detail (default: 0.5)')
     args = parser.parse_args()
     pycode_list = [(f.name, f.read()) for f in args.files]
     results = detect([c[1] for c in pycode_list])
@@ -399,7 +399,7 @@ if __name__ == '__main__':
         print('candidate: {}'.format(pycode_list[index][0]))
         total_ast_lines = sum(len(func_diff_info.info_ref.func_ast_lines) for func_diff_info in func_ast_diff_list)
         plagiarism_ast_lines = sum(func_diff_info.plagiarism_line_count for func_diff_info in func_ast_diff_list)
-        print('{:.2f} % ({}/{}) of candidate code structure plagiarism from ref.'.format(
+        print('{:.2f} % ({}/{}) of ref code structure is plagiarized by candidate.'.format(
             plagiarism_ast_lines / float(total_ast_lines) * 100,
             plagiarism_ast_lines,
             total_ast_lines))
