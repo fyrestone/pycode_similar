@@ -5,6 +5,16 @@ This is a simple plagiarism detection tool for python code, the basic idea is to
 
 It only cost me a couple of hours to implement this tool, so there is still a long way to improve the speed and accuracy, but it already performs great in detecting the plagiarism of new recruits' homeworks in our company.
 
+Compare to Moss
+---------------
+
+- pure python implementation
+- only contains one source file
+- no third-party dependency
+- no need to register account for Moss
+- no need of network to access Moss
+
+This tool was born before I know there is a `Moss (for a Measure Of Software Similarity)  <https://theory.stanford.edu/~aiken/moss/>`_ to determine the similarity of programs. And I have tried many ways to register account for Stanford Moss, but still can't get a valid account. So, I have no accurate comparison between pycode_similar and Moss.
 
 Installation
 --------------
