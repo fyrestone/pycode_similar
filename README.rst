@@ -89,7 +89,8 @@ Or perform
 	1.0 : ref unified_diff<281:0>, candidate unified_diff<313:0>
 	0.85: ref FuncNodeCollector.visit_Compare<108:4>, candidate FuncNodeCollector._simple_nomalize<110:8>
 	
-Click here to view this -> 0.85: ref FuncNodeCollector.visit_Compare<108:4>, candidate FuncNodeCollector._simple_nomalize<110:8>
+Click `here  <https://github.com/fyrestone/pycode_similar/commit/149182beee460cbaf21d0995aa442a079ddf1fa9#diff-a30b425e81348c978616747430632fa8>`_
+to view this diff -> `0.85: ref FuncNodeCollector.visit_Compare<108:4>, candidate FuncNodeCollector._simple_nomalize<110:8>`
 
 Repository
 --------------
