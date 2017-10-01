@@ -23,7 +23,7 @@ Usage
 
 Just use it as a standard command line tool.
 
-.. code-block:: shell
+.. code-block:: text
 
 	$ python pycode_similar.py
 	usage: pycode_similar.py [-h] [-l L] [-p P] files files
@@ -57,7 +57,7 @@ If you have the source code you can run the tests with
  
 Or perform
 
-.. code-block:: shell
+.. code-block:: text
 
 	$ python pycode_similar.py pycode_similar/tests/original_version.py pycode_similar.py
 
@@ -88,6 +88,8 @@ Or perform
 	1.0 : ref ArgParser.error<267:4>, candidate ArgParser.error<284:4>
 	1.0 : ref unified_diff<281:0>, candidate unified_diff<313:0>
 	0.85: ref FuncNodeCollector.visit_Compare<108:4>, candidate FuncNodeCollector._simple_nomalize<110:8>
+	
+Click here to view this -> 0.85: ref FuncNodeCollector.visit_Compare<108:4>, candidate FuncNodeCollector._simple_nomalize<110:8>
 
 Repository
 --------------
