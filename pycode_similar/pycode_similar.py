@@ -79,6 +79,7 @@ class FuncNodeCollector(ast.NodeTransformer):
 
     def visit_Expr(self, node):
         if not self._is_docstring(node):
+            self.generic_visit(node)
             return node
 
     def visit_Name(self, node):

@@ -117,6 +117,18 @@ def bar(b):
             result = pycode_similar.detect([s1, s2])
             self.assertEqual(result[0][1][0].plagiarism_percent, 1)
 
+    def test_expr(self):
+        s1 = """
+def foo(a):
+    yield c
+            """
+        s2 = """
+def bar(b):
+    yield a
+            """
+        result = pycode_similar.detect([s1, s2])
+        self.assertEqual(result[0][1][0].plagiarism_percent, 1)
+
 
 if __name__ == "__main__":
 #     import sys;sys.argv = ['', 'Test.test_reload_custom_code_after_changes_in_class']
