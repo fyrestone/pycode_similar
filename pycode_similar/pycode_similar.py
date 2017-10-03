@@ -9,6 +9,8 @@ import argparse
 import itertools
 import collections
 
+import zss
+
 
 class FuncNodeCollector(ast.NodeTransformer):
     """
@@ -21,6 +23,7 @@ class FuncNodeCollector(ast.NodeTransformer):
         self._curr_class_names = []
         self._func_nodes = []
         self._last_node_lineno = -1
+        self._node_count = 0
 
     @staticmethod
     def _mark_docstring_sub_nodes(node):
@@ -68,6 +71,7 @@ class FuncNodeCollector(ast.NodeTransformer):
         return getattr(node, 'is_docstring', False)
 
     def generic_visit(self, node):
+        self._node_count = self._node_count + 1
         self._last_node_lineno = max(getattr(node, 'lineno', -1), self._last_node_lineno)
         self._mark_docstring_sub_nodes(node)
         return super(FuncNodeCollector, self).generic_visit(node)
@@ -103,8 +107,10 @@ class FuncNodeCollector(ast.NodeTransformer):
     def visit_FunctionDef(self, node):
         node.name = '.'.join(itertools.chain(self._curr_class_names, [node.name]))
         self._func_nodes.append(node)
+        count = self._node_count
         self.generic_visit(node)
         node.endlineno = self._last_node_lineno
+        node.nsubnodes = self._node_count - count
         return node
 
     def visit_Compare(self, node):
@@ -297,8 +303,12 @@ class FuncDiffInfo(object):
 
     info_ref = None
     info_candidate = None
-    plagiarism_percent = 0
-    plagiarism_line_count = 0
+    plagiarism_count = 0
+    total_count = 0
+
+    @property
+    def plagiarism_percent(self):
+        return 0 if self.total_count == 0 else (self.plagiarism_count / float(self.total_count))
 
     def __str__(self):
         if isinstance(self.info_ref, FuncInfo) and isinstance(self.info_candidate, FuncInfo):
@@ -312,26 +322,65 @@ class FuncDiffInfo(object):
         return '{:<4.2}: ref {}, candidate {}'.format(0, None, None)
 
 
-def unified_diff(a, b):
-    """
-    Simpler and faster implementation of difflib.unified_diff.
-    """
+class UnifiedDiff(object):
+    @staticmethod
+    def diff(a, b):
+        """
+        Simpler and faster implementation of difflib.unified_diff.
+        """
+        a = a.func_ast_lines
+        b = b.func_ast_lines
 
-    for group in difflib.SequenceMatcher(None, a, b).get_grouped_opcodes(0):
-        for tag, i1, i2, j1, j2 in group:
-            if tag == 'equal':
-                for line in a[i1:i2]:
-                    yield ''
-                continue
-            if tag in ('replace', 'delete'):
-                for line in a[i1:i2]:
-                    yield '-'
-            if tag in ('replace', 'insert'):
-                for line in b[j1:j2]:
-                    yield '+'
+        def _gen():
+            for group in difflib.SequenceMatcher(None, a, b).get_grouped_opcodes(0):
+                for tag, i1, i2, j1, j2 in group:
+                    if tag == 'equal':
+                        for line in a[i1:i2]:
+                            yield ''
+                        continue
+                    if tag in ('replace', 'delete'):
+                        for line in a[i1:i2]:
+                            yield '-'
+                    if tag in ('replace', 'insert'):
+                        for line in b[j1:j2]:
+                            yield '+'
+
+        return collections.Counter(_gen())['-']
+
+    @staticmethod
+    def total(a, b):
+        return len(a.func_ast_lines)
 
 
-def detect(pycode_string_list):
+class TreeDiff(object):
+    @staticmethod
+    def diff(a, b):
+        def _str_dist(i, j):
+            if i == j:
+                return 0
+            else:
+                return 1
+
+        def _get_label(n):
+            return type(n).__name__
+
+        def _get_children(n):
+            if not hasattr(n, 'children'):
+                n.children = list(ast.iter_child_nodes(n))
+            return n.children
+
+        res = zss.distance(a.func_node, b.func_node, _get_children,
+                           lambda node: 0,
+                           lambda node: _str_dist(_get_label(node), ''),
+                           lambda _a, _b: _str_dist(_get_label(_a), _get_label(_b)), )
+        return res
+
+    @staticmethod
+    def total(a, b):
+        return a.func_node.nsubnodes
+
+
+def detect(pycode_string_list, diff_method=UnifiedDiff):
     if len(pycode_string_list) < 2:
         return []
 
@@ -349,20 +398,21 @@ def detect(pycode_string_list):
     for index_candidate, func_info_candidate in func_info_list[1:]:
         func_ast_diff_list = []
         for fi1 in func_info_ref:
-            min_diff_line_count = sys.maxint
-            min_diff_fi2 = None
+            min_diff_value = sys.maxint
+            min_diff_func_info = None
             for fi2 in func_info_candidate:
-                dv = unified_diff(fi1.func_ast_lines, fi2.func_ast_lines)
-                counter = collections.Counter(dv)
-                if counter['-'] < min_diff_line_count:
-                    min_diff_line_count = counter['-']
-                    min_diff_fi2 = fi2
+                dv = diff_method.diff(fi1, fi2)
+                if dv < min_diff_value:
+                    min_diff_value = dv
+                    min_diff_func_info = fi2
+                if dv == 0:
+                    break
 
             func_diff_info = FuncDiffInfo()
             func_diff_info.info_ref = fi1
-            func_diff_info.info_candidate = min_diff_fi2
-            func_diff_info.plagiarism_percent = 1 - min_diff_line_count / float(len(fi1.func_ast_lines))
-            func_diff_info.plagiarism_line_count = len(fi1.func_ast_lines) - min_diff_line_count
+            func_diff_info.info_candidate = min_diff_func_info
+            func_diff_info.total_count = diff_method.total(fi1, min_diff_func_info)
+            func_diff_info.plagiarism_count = func_diff_info.total_count - min_diff_value
             func_ast_diff_list.append(func_diff_info)
         func_ast_diff_list.sort(key=operator.attrgetter('plagiarism_percent'), reverse=True)
         ast_diff_result.append((index_candidate, func_ast_diff_list))
@@ -401,12 +451,12 @@ def main():
     for index, func_ast_diff_list in results:
         print('ref: {}'.format(pycode_list[0][0]))
         print('candidate: {}'.format(pycode_list[index][0]))
-        total_ast_lines = sum(len(func_diff_info.info_ref.func_ast_lines) for func_diff_info in func_ast_diff_list)
-        plagiarism_ast_lines = sum(func_diff_info.plagiarism_line_count for func_diff_info in func_ast_diff_list)
+        sum_total_count = sum(func_diff_info.total_count for func_diff_info in func_ast_diff_list)
+        sum_plagiarism_count = sum(func_diff_info.plagiarism_count for func_diff_info in func_ast_diff_list)
         print('{:.2f} % ({}/{}) of ref code structure is plagiarized by candidate.'.format(
-            plagiarism_ast_lines / float(total_ast_lines) * 100,
-            plagiarism_ast_lines,
-            total_ast_lines))
+            sum_plagiarism_count / float(sum_total_count) * 100,
+            sum_plagiarism_count,
+            sum_total_count))
         print('candidate function plagiarism details (AST lines >= {} and plagiarism percentage >= {}):'.format(
             args.l,
             args.p,
