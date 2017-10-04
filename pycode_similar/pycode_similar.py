@@ -490,7 +490,11 @@ def main():
                         help='if plagiarism percentage of the function >= value then output detail (default: 0.5)')
     args = parser.parse_args()
     pycode_list = [(f.name, f.read()) for f in args.files]
-    results = detect([c[1] for c in pycode_list])
+    try:
+        results = detect([c[1] for c in pycode_list])
+    except NoFuncException as ex:
+        print('error: can not find functions from {}.'.format(pycode_list[ex.source][0]))
+        return
 
     for index, func_ast_diff_list in results:
         print('ref: {}'.format(pycode_list[0][0]))
@@ -505,9 +509,13 @@ def main():
             args.l,
             args.p,
         ))
+        output_count = 0
         for func_diff_info in func_ast_diff_list:
             if len(func_diff_info.info_ref.func_ast_lines) >= args.l and func_diff_info.plagiarism_percent >= args.p:
+                output_count = output_count + 1
                 print(func_diff_info)
+        if output_count == 0:
+            print('<empty results>')
 
 
 if __name__ == '__main__':
