@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 __author__ = 'fyrestone@outlook.com'
 __version__ = '1.0'
 
@@ -8,8 +9,6 @@ import operator
 import argparse
 import itertools
 import collections
-
-import zss
 
 
 class FuncNodeCollector(ast.NodeTransformer):
@@ -323,11 +322,17 @@ class FuncDiffInfo(object):
 
 
 class UnifiedDiff(object):
+    """
+    Line diff algorithm to formatted AST string lines, naive but efficiency, result is good enough.
+    """
+
     @staticmethod
     def diff(a, b):
         """
         Simpler and faster implementation of difflib.unified_diff.
         """
+        assert a is not None
+        assert b is not None
         a = a.func_ast_lines
         b = b.func_ast_lines
 
@@ -349,17 +354,22 @@ class UnifiedDiff(object):
 
     @staticmethod
     def total(a, b):
+        assert a is not None  # b may be None
         return len(a.func_ast_lines)
 
 
 class TreeDiff(object):
+    """
+    Tree edit distance algorithm to AST, very slow and the result is not good for small functions.
+    """
+
     @staticmethod
     def diff(a, b):
+        assert a is not None
+        assert b is not None
+
         def _str_dist(i, j):
-            if i == j:
-                return 0
-            else:
-                return 1
+            return 0 if i == j else 1
 
         def _get_label(n):
             return type(n).__name__
@@ -369,15 +379,24 @@ class TreeDiff(object):
                 n.children = list(ast.iter_child_nodes(n))
             return n.children
 
+        import zss
         res = zss.distance(a.func_node, b.func_node, _get_children,
-                           lambda node: 0,
-                           lambda node: _str_dist(_get_label(node), ''),
-                           lambda _a, _b: _str_dist(_get_label(_a), _get_label(_b)), )
+                           lambda node: 0,  # insert cost
+                           lambda node: _str_dist(_get_label(node), ''),  # remove cost
+                           lambda _a, _b: _str_dist(_get_label(_a), _get_label(_b)), )  # update cost
         return res
 
     @staticmethod
     def total(a, b):
+        #  The count of AST nodes in referenced function
+        assert a is not None  # b may be None
         return a.func_node.nsubnodes
+
+
+class NoFuncException(Exception):
+    def __init__(self, source):
+        super(NoFuncException, self).__init__('Can not find any functions from code, index = {}'.format(source))
+        self.source = source
 
 
 def detect(pycode_string_list, diff_method=UnifiedDiff):
@@ -395,6 +414,9 @@ def detect(pycode_string_list, diff_method=UnifiedDiff):
 
     ast_diff_result = []
     index_ref, func_info_ref = func_info_list[0]
+    if len(func_info_ref) == 0:
+        raise NoFuncException(index_ref)
+
     for index_candidate, func_info_candidate in func_info_list[1:]:
         func_ast_diff_list = []
         for fi1 in func_info_ref:
@@ -405,14 +427,14 @@ def detect(pycode_string_list, diff_method=UnifiedDiff):
                 if dv < min_diff_value:
                     min_diff_value = dv
                     min_diff_func_info = fi2
-                if dv == 0:
+                if dv == 0:  # entire function structure is plagiarized by candidate
                     break
 
             func_diff_info = FuncDiffInfo()
             func_diff_info.info_ref = fi1
             func_diff_info.info_candidate = min_diff_func_info
             func_diff_info.total_count = diff_method.total(fi1, min_diff_func_info)
-            func_diff_info.plagiarism_count = func_diff_info.total_count - min_diff_value
+            func_diff_info.plagiarism_count = func_diff_info.total_count - min_diff_value if min_diff_func_info else 0
             func_ast_diff_list.append(func_diff_info)
         func_ast_diff_list.sort(key=operator.attrgetter('plagiarism_percent'), reverse=True)
         ast_diff_result.append((index_candidate, func_ast_diff_list))
@@ -420,6 +442,28 @@ def detect(pycode_string_list, diff_method=UnifiedDiff):
     return ast_diff_result
 
 
+def _profile(fn):
+    """
+    A simple profile decorator
+    :param fn: target function to be profiled
+    :return: The wrapper function
+    """
+    import functools
+    import cProfile
+
+    @functools.wraps(fn)
+    def _wrapper(*args, **kwargs):
+        pr = cProfile.Profile()
+        pr.enable()
+        res = fn(*args, **kwargs)
+        pr.disable()
+        pr.print_stats('cumulative')
+        return res
+
+    return _wrapper
+
+
+# @_profile
 def main():
     """
     The console_scripts Entry Point in setup.py
