@@ -1,6 +1,11 @@
 HISTORY
 --------
 
+## 1.2 (2018-1-18)
+
+- Fix python3 capability issue.
+- Remove print for python23.
+
 ## 1.1 (2017-10-04)
 
 - Add TreeDiff method based on zss.
