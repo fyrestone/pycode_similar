@@ -145,6 +145,21 @@ class B(object):
         result = pycode_similar.detect([s1, s2])
         self.assertEqual(result[0][1][0].plagiarism_percent, 0)
 
+    def test_strip_print(self):
+        s1 = """
+def foo(a):
+    a = b
+    print('abc', a)
+            """
+        s2 = """
+def foo(a):
+    print('abc', bar())
+    a = b
+            """
+
+        result = pycode_similar.detect([s1, s2])
+        self.assertEqual(result[0][1][0].plagiarism_percent, 1)
+
 
 
 if __name__ == "__main__":

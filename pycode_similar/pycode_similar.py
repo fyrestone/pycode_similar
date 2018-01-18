@@ -83,7 +83,19 @@ class FuncNodeCollector(ast.NodeTransformer):
     def visit_Expr(self, node):
         if not self._is_docstring(node):
             self.generic_visit(node)
-            return node
+            if hasattr(node, 'value'):
+                return node
+
+    def visit_arg(self, node):
+        """
+        remove arg name & annotation for python3
+        :param node: ast.arg
+        :return:
+        """
+        del node.arg
+        del node.annotation
+        self.generic_visit(node)
+        return node
 
     def visit_Name(self, node):
         del node.id
@@ -96,6 +108,11 @@ class FuncNodeCollector(ast.NodeTransformer):
         del node.ctx
         self.generic_visit(node)
         return node
+
+    def visit_Call(self, node):
+        # remove print call and its sub nodes for python3
+        if node.func.id != 'print':
+            return node
 
     def visit_ClassDef(self, node):
         self._curr_class_names.append(node.name)
@@ -136,6 +153,10 @@ class FuncNodeCollector(ast.NodeTransformer):
 
         self.generic_visit(node)
         return node
+
+    def visit_Print(self, node):
+        # remove print expr for python2
+        pass
 
     def clear(self):
         self._func_nodes = []
