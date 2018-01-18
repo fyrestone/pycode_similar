@@ -110,9 +110,10 @@ class FuncNodeCollector(ast.NodeTransformer):
         return node
 
     def visit_Call(self, node):
-        # remove print call and its sub nodes for python3
-        if node.func.id != 'print':
-            return node
+        func = getattr(node, 'func', None)
+        if func and isinstance(func, ast.Name) and func.id == 'print':
+            return  # remove print call and its sub nodes for python3
+        return node
 
     def visit_ClassDef(self, node):
         self._curr_class_names.append(node.name)
