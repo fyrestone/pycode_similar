@@ -3,7 +3,7 @@ HISTORY
 
 ## 1.2 (2018-1-18)
 
-- Fix python3 capability issue.
+- Fix python3 compatibility issue.
 - Remove print for python23.
 
 ## 1.1 (2017-10-04)
