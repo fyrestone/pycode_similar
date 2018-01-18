@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __author__ = 'fyrestone@outlook.com'
-__version__ = '1.1'
+__version__ = '1.2'
 
 import sys
 import ast
