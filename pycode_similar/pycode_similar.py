@@ -482,7 +482,7 @@ def main():
         return ivalue
 
     def get_file(value):
-        return open(value)
+        return open(value, 'rb')
 
     parser = ArgParser(description='A simple plagiarism detection tool for python code')
     parser.add_argument('files', type=get_file, nargs=2,
