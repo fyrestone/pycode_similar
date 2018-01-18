@@ -118,7 +118,7 @@ class FuncNodeCollector(ast.NodeTransformer):
             if node.ops and len(node.ops) == 1 and type(node.ops[0]).__name__ in ops_type_names:
                 if node.left and node.comparators and len(node.comparators) == 1:
                     left, right = node.left, node.comparators[0]
-                    if cmp(type(left).__name__, type(right).__name__) > 0:
+                    if type(left).__name__ > type(right).__name__:
                         left, right = right, left
                         node.left = left
                         node.comparators = [right]
@@ -420,7 +420,7 @@ def detect(pycode_string_list, diff_method=UnifiedDiff):
     for index_candidate, func_info_candidate in func_info_list[1:]:
         func_ast_diff_list = []
         for fi1 in func_info_ref:
-            min_diff_value = sys.maxint
+            min_diff_value = int((1 << 31) - 1)
             min_diff_func_info = None
             for fi2 in func_info_candidate:
                 dv = diff_method.diff(fi1, fi2)
@@ -481,8 +481,11 @@ def main():
             raise argparse.ArgumentTypeError("%s is an invalid percentage limit" % value)
         return ivalue
 
+    def get_file(value):
+        return open(value)
+
     parser = ArgParser(description='A simple plagiarism detection tool for python code')
-    parser.add_argument('files', type=file, nargs=2,
+    parser.add_argument('files', type=get_file, nargs=2,
                         help='the input files')
     parser.add_argument('-l', type=check_line_limit, default=4,
                         help='if AST line of the function >= value then output detail (default: 4)')
