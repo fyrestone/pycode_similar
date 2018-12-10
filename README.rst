@@ -57,7 +57,7 @@ Of course, you can use it as a python library, too.
 .. code-block:: python
 
 	import pycode_similar
-	pycode_similar.detect([referenced_code_str, candidate_code_str1, candidate_code_str2, ...], diff_method=UnifiedDiff)
+	pycode_similar.detect([referenced_code_str, candidate_code_str1, candidate_code_str2, ...], diff_method=pycode_similar.UnifiedDiff)
 	
 	
 Implementation
