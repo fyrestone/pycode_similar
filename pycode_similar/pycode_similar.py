@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 __author__ = 'fyrestone@outlook.com'
-__version__ = '1.2'
+__version__ = '1.3'
 
 import sys
 import ast
@@ -8,7 +8,18 @@ import difflib
 import operator
 import argparse
 import itertools
-import collections
+from collections import Counter
+
+# avoid using six to keep dependency clean
+if sys.version_info >= (3, 3):
+    import collections.abc as collections
+else:
+    import collections
+
+if sys.version_info[0] == 3:
+    string_types = str
+else:
+    string_types = basestring
 
 
 class FuncNodeCollector(ast.NodeTransformer):
@@ -74,6 +85,15 @@ class FuncNodeCollector(ast.NodeTransformer):
         self._last_node_lineno = max(getattr(node, 'lineno', -1), self._last_node_lineno)
         self._mark_docstring_sub_nodes(node)
         return super(FuncNodeCollector, self).generic_visit(node)
+
+    def visit_Constant(self, node):
+        # introduce a special value for erasing constant node value,
+        # del node.value will make node.s and node.n raise Exception.
+        # for Python 3.8
+        dummy_value = '__pycode_similar_dummy_value__'
+        if type(node) == str:
+            node.value = dummy_value
+        self.generic_visit(node)
 
     def visit_Str(self, node):
         del node.s
@@ -159,6 +179,14 @@ class FuncNodeCollector(ast.NodeTransformer):
         # remove print expr for python2
         pass
 
+    def visit_Import(self, node):
+        # remote import ...
+        pass
+
+    def visit_ImportFrom(self, node):
+        # remote from ... import ...
+        pass
+
     def clear(self):
         self._func_nodes = []
 
@@ -229,7 +257,7 @@ class FuncInfo(object):
     def _retrieve_func_code_lines(func_node, code_lines):
         if not isinstance(func_node, ast.FunctionDef):
             return []
-        if not isinstance(code_lines, collections.Sequence) or isinstance(code_lines, basestring):
+        if not isinstance(code_lines, collections.Sequence) or isinstance(code_lines, string_types):
             return []
         if getattr(func_node, 'endlineno', -1) < getattr(func_node, 'lineno', 0):
             return []
@@ -335,11 +363,11 @@ class FuncDiffInfo(object):
         if isinstance(self.info_ref, FuncInfo) and isinstance(self.info_candidate, FuncInfo):
             return '{:<4.2}: ref {}, candidate {}'.format(self.plagiarism_percent,
                                                           self.info_ref.func_name + '<' + str(
-                                                              self.info_ref.func_node.lineno) + ':' + str(
-                                                              self.info_ref.func_node.col_offset) + '>',
+                                                                  self.info_ref.func_node.lineno) + ':' + str(
+                                                                  self.info_ref.func_node.col_offset) + '>',
                                                           self.info_candidate.func_name + '<' + str(
-                                                              self.info_candidate.func_node.lineno) + ':' + str(
-                                                              self.info_candidate.func_node.col_offset) + '>')
+                                                                  self.info_candidate.func_node.lineno) + ':' + str(
+                                                                  self.info_candidate.func_node.col_offset) + '>')
         return '{:<4.2}: ref {}, candidate {}'.format(0, None, None)
 
 
@@ -372,7 +400,7 @@ class UnifiedDiff(object):
                         for line in b[j1:j2]:
                             yield '+'
 
-        return collections.Counter(_gen())['-']
+        return Counter(_gen())['-']
 
     @staticmethod
     def total(a, b):
@@ -527,12 +555,12 @@ def main():
         sum_total_count = sum(func_diff_info.total_count for func_diff_info in func_ast_diff_list)
         sum_plagiarism_count = sum(func_diff_info.plagiarism_count for func_diff_info in func_ast_diff_list)
         print('{:.2f} % ({}/{}) of ref code structure is plagiarized by candidate.'.format(
-            sum_plagiarism_count / float(sum_total_count) * 100,
-            sum_plagiarism_count,
-            sum_total_count))
+                sum_plagiarism_count / float(sum_total_count) * 100,
+                sum_plagiarism_count,
+                sum_total_count))
         print('candidate function plagiarism details (AST lines >= {} and plagiarism percentage >= {}):'.format(
-            args.l,
-            args.p,
+                args.l,
+                args.p,
         ))
         output_count = 0
         for func_diff_info in func_ast_diff_list:

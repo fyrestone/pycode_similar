@@ -1,6 +1,10 @@
 HISTORY
 --------
 
+## 1.3 (2019-12-8)
+- Fix python 3.8 compatibility issue [#4](https://github.com/fyrestone/pycode_similar/issues/4) (Thanks to aginiewicz)
+- Remove import expr
+
 ## 1.2 (2018-1-18)
 
 - Fix python3 compatibility issue.
