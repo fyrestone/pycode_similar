@@ -8,6 +8,7 @@ import difflib
 import operator
 import argparse
 import itertools
+import textwrap
 from collections import Counter
 
 # avoid using six to keep dependency clean
@@ -449,6 +450,10 @@ class NoFuncException(Exception):
         self.source = source
 
 
+def wrap_module_to_function(pycode):
+    return "def main():\n" + textwrap.indent(pycode, " "*4)
+
+
 def detect(pycode_string_list, diff_method=UnifiedDiff):
     if len(pycode_string_list) < 2:
         return []
@@ -458,6 +463,13 @@ def detect(pycode_string_list, diff_method=UnifiedDiff):
         root_node = ast.parse(code_str)
         collector = FuncNodeCollector()
         collector.visit(root_node)
+        if not collector._func_nodes:
+            print("warning: No functions found, will add `main` to nest the module")
+            collector.clear()
+            code_str = wrap_module_to_function(code_str)
+            root_node = ast.parse(code_str)
+            collector.visit(root_node)
+
         code_utf8_lines = code_str.splitlines(True)
         func_info = [FuncInfo(n, code_utf8_lines) for n in collector.get_function_nodes()]
         func_info_list.append((index, func_info))
@@ -532,7 +544,7 @@ def main():
         return ivalue
 
     def get_file(value):
-        return open(value, 'rb')
+        return open(value, 'r')
 
     parser = ArgParser(description='A simple plagiarism detection tool for python code')
     parser.add_argument('files', type=get_file, nargs=2,
