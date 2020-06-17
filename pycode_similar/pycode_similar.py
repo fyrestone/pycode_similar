@@ -129,6 +129,7 @@ class BaseNodeNormalizer(ast.NodeTransformer):
         func = getattr(node, 'func', None)
         if not self.keep_prints and func and isinstance(func, ast.Name) and func.id == 'print':
             return  # remove print call and its sub nodes for python3
+        self.generic_visit(node)
         return node
 
     def visit_Compare(self, node):
