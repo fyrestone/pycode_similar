@@ -22,17 +22,14 @@ else:
     string_types = basestring
 
 
-class FuncNodeCollector(ast.NodeTransformer):
+class BaseNodeNormalizer(ast.NodeTransformer):
     """
     Clean node attributes, delete the attributes that are not helpful for recognition repetition.
-    Then collect all function nodes.
     """
 
-    def __init__(self):
-        super(FuncNodeCollector, self).__init__()
-        self._curr_class_names = []
-        self._func_nodes = []
-        self._last_node_lineno = -1
+    def __init__(self, keep_prints=False):
+        super(BaseNodeNormalizer, self).__init__()
+        self.keep_prints = keep_prints
         self._node_count = 0
 
     @staticmethod
@@ -82,9 +79,8 @@ class FuncNodeCollector(ast.NodeTransformer):
 
     def generic_visit(self, node):
         self._node_count = self._node_count + 1
-        self._last_node_lineno = max(getattr(node, 'lineno', -1), self._last_node_lineno)
         self._mark_docstring_sub_nodes(node)
-        return super(FuncNodeCollector, self).generic_visit(node)
+        return super(BaseNodeNormalizer, self).generic_visit(node)
 
     def visit_Constant(self, node):
         # introduce a special value for erasing constant node value,
@@ -131,23 +127,8 @@ class FuncNodeCollector(ast.NodeTransformer):
 
     def visit_Call(self, node):
         func = getattr(node, 'func', None)
-        if func and isinstance(func, ast.Name) and func.id == 'print':
+        if not self.keep_prints and func and isinstance(func, ast.Name) and func.id == 'print':
             return  # remove print call and its sub nodes for python3
-        return node
-
-    def visit_ClassDef(self, node):
-        self._curr_class_names.append(node.name)
-        self.generic_visit(node)
-        self._curr_class_names.pop()
-        return node
-
-    def visit_FunctionDef(self, node):
-        node.name = '.'.join(itertools.chain(self._curr_class_names, [node.name]))
-        self._func_nodes.append(node)
-        count = self._node_count
-        self.generic_visit(node)
-        node.endlineno = self._last_node_lineno
-        node.nsubnodes = self._node_count - count
         return node
 
     def visit_Compare(self, node):
@@ -176,19 +157,81 @@ class FuncNodeCollector(ast.NodeTransformer):
         return node
 
     def visit_Print(self, node):
-        # remove print expr for python2
-        pass
+        if not self.keep_prints:
+            # remove print stmt for python2
+            return
+        self.generic_visit(node)
+        return node
 
     def visit_Import(self, node):
-        # remote import ...
+        # remove import ...
         pass
 
     def visit_ImportFrom(self, node):
-        # remote from ... import ...
+        # remove from ... import ...
         pass
 
-    def clear(self):
+
+class ModuleNodeCollector(BaseNodeNormalizer):
+    """
+    Normalize and remove all class nodes and function nodes - leave only module level nodes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(ModuleNodeCollector, self).__init__(*args, **kwargs)
+        self._module_node = None
+
+    def visit_ClassDef(self, node):
+        # remove class ...
+        return
+
+    def visit_FunctionDef(self, node):
+        # remove function ...
+        return
+
+    def visit_Module(self, node):
+        self._module_node = node
+        count = self._node_count
+        self.generic_visit(node)
+        node.name = '__main__'
+        node.lineno = 1
+        node.col_offset = 0
+        node.nsubnodes = self._node_count - count
+        return node
+
+    def get_module_node(self):
+        return self._module_node
+
+
+class FuncNodeCollector(BaseNodeNormalizer):
+    """
+    Normalize and collect all function nodes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(FuncNodeCollector, self).__init__(*args, **kwargs)
+        self._curr_class_names = []
         self._func_nodes = []
+        self._last_node_lineno = -1
+
+    def generic_visit(self, node):
+        self._last_node_lineno = max(getattr(node, 'lineno', -1), self._last_node_lineno)
+        return super(FuncNodeCollector, self).generic_visit(node)
+
+    def visit_ClassDef(self, node):
+        self._curr_class_names.append(node.name)
+        self.generic_visit(node)
+        self._curr_class_names.pop()
+        return node
+
+    def visit_FunctionDef(self, node):
+        node.name = '.'.join(itertools.chain(self._curr_class_names, [node.name]))
+        self._func_nodes.append(node)
+        count = self._node_count
+        self.generic_visit(node)
+        node.endlineno = self._last_node_lineno
+        node.nsubnodes = self._node_count - count
+        return node
 
     def get_function_nodes(self):
         return self._func_nodes
@@ -209,7 +252,7 @@ class FuncInfo(object):
         pass
 
     def __init__(self, func_node, code_lines):
-        assert isinstance(func_node, ast.FunctionDef)
+        assert isinstance(func_node, (ast.FunctionDef, ast.Module))
         self._func_node = func_node
         self._code_lines = code_lines
         self._func_name = func_node.__dict__.pop('name', '')
@@ -255,7 +298,7 @@ class FuncInfo(object):
 
     @staticmethod
     def _retrieve_func_code_lines(func_node, code_lines):
-        if not isinstance(func_node, ast.FunctionDef):
+        if not isinstance(func_node, (ast.FunctionDef, ast.Module)):
             return []
         if not isinstance(code_lines, collections.Sequence) or isinstance(code_lines, string_types):
             return []
@@ -449,17 +492,25 @@ class NoFuncException(Exception):
         self.source = source
 
 
-def detect(pycode_string_list, diff_method=UnifiedDiff):
+def detect(pycode_string_list, diff_method=UnifiedDiff, keep_prints=False, module_level=False):
     if len(pycode_string_list) < 2:
         return []
 
     func_info_list = []
     for index, code_str in enumerate(pycode_string_list):
         root_node = ast.parse(code_str)
-        collector = FuncNodeCollector()
+        collector = FuncNodeCollector(keep_prints=keep_prints)
         collector.visit(root_node)
         code_utf8_lines = code_str.splitlines(True)
         func_info = [FuncInfo(n, code_utf8_lines) for n in collector.get_function_nodes()]
+        if module_level:
+            root_node = ast.parse(code_str)
+            collector = ModuleNodeCollector(keep_prints=keep_prints)
+            collector.visit(root_node)
+            module_node = collector.get_module_node()
+            module_node.endlineno = len(code_utf8_lines)
+            module_info = FuncInfo(module_node, code_utf8_lines)
+            func_info.append(module_info)
         func_info_list.append((index, func_info))
 
     ast_diff_result = []
@@ -469,6 +520,7 @@ def detect(pycode_string_list, diff_method=UnifiedDiff):
 
     for index_candidate, func_info_candidate in func_info_list[1:]:
         func_ast_diff_list = []
+
         for fi1 in func_info_ref:
             min_diff_value = int((1 << 31) - 1)
             min_diff_func_info = None
@@ -513,6 +565,16 @@ def _profile(fn):
     return _wrapper
 
 
+def summarize(func_ast_diff_list):
+    sum_total_count = sum(func_diff_info.total_count for func_diff_info in func_ast_diff_list)
+    sum_plagiarism_count = sum(func_diff_info.plagiarism_count for func_diff_info in func_ast_diff_list)
+    if sum_total_count == 0:
+        sum_plagiarism_percent = 0
+    else:
+        sum_plagiarism_percent = sum_plagiarism_count / float(sum_total_count) * 100
+    return sum_plagiarism_percent, sum_plagiarism_count, sum_total_count
+
+
 # @_profile
 def main():
     """
@@ -541,10 +603,18 @@ def main():
                         help='if AST line of the function >= value then output detail (default: 4)')
     parser.add_argument('-p', type=check_percentage_limit, default=0.5,
                         help='if plagiarism percentage of the function >= value then output detail (default: 0.5)')
+    parser.add_argument('-k', '--keep-prints', action='store_true', default=False,
+                        help='keep print nodes')
+    parser.add_argument('-m', '--module-level', action='store_true', default=False,
+                        help='process module level nodes')
     args = parser.parse_args()
     pycode_list = [(f.name, f.read()) for f in args.files]
     try:
-        results = detect([c[1] for c in pycode_list])
+        results = detect(
+            [c[1] for c in pycode_list],
+            keep_prints=args.keep_prints,
+            module_level=args.module_level,
+        )
     except NoFuncException as ex:
         print('error: can not find functions from {}.'.format(pycode_list[ex.source][0]))
         return
@@ -552,21 +622,22 @@ def main():
     for index, func_ast_diff_list in results:
         print('ref: {}'.format(pycode_list[0][0]))
         print('candidate: {}'.format(pycode_list[index][0]))
-        sum_total_count = sum(func_diff_info.total_count for func_diff_info in func_ast_diff_list)
-        sum_plagiarism_count = sum(func_diff_info.plagiarism_count for func_diff_info in func_ast_diff_list)
+        sum_plagiarism_percent, sum_plagiarism_count, sum_total_count = summarize(func_ast_diff_list)
         print('{:.2f} % ({}/{}) of ref code structure is plagiarized by candidate.'.format(
-                sum_plagiarism_count / float(sum_total_count) * 100,
-                sum_plagiarism_count,
-                sum_total_count))
+            sum_plagiarism_percent,
+            sum_plagiarism_count,
+            sum_total_count,
+        ))
         print('candidate function plagiarism details (AST lines >= {} and plagiarism percentage >= {}):'.format(
-                args.l,
-                args.p,
+            args.l,
+            args.p,
         ))
         output_count = 0
         for func_diff_info in func_ast_diff_list:
             if len(func_diff_info.info_ref.func_ast_lines) >= args.l and func_diff_info.plagiarism_percent >= args.p:
                 output_count = output_count + 1
                 print(func_diff_info)
+
         if output_count == 0:
             print('<empty results>')
 
