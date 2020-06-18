@@ -36,7 +36,7 @@ Just use it as a standard command line tool if pip install properly.
 .. code-block:: text
 
 	$ pycode_similar
-	usage: pycode_similar.py [-h] [-l L] [-p P] [-k] [-m] files files
+	usage: pycode_similar [-h] [-l L] [-p P] [-k] [-m] files files
 
 	A simple plagiarism detection tool for python code
 
