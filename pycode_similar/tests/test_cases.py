@@ -178,6 +178,62 @@ def foo():
         result = pycode_similar.detect([s1, s2])
         self.assertEqual(result[0][1][0].plagiarism_percent, 1)
 
+    def test_module_level(self):
+        s1 = """
+def main():
+    s = 0
+    for j in range(10):
+        for i in range(10):
+            if i > j:
+                s += i + j
+    print(s)
+
+if __name__ == '__main__':
+    main()
+"""
+        s2 = """
+s = 0
+for j in range(10):
+    for i in range(10):
+        if i > j:
+            s += i + j
+print(s)
+"""
+        result = pycode_similar.detect([s1, s2], module_level=True)
+        sum_plagiarism_percent, *tail = pycode_similar.summarize(result[0][1])
+        # s1.main vs s2.__main__ AND s1.__main__ vs s2.__main__
+        self.assertGreater(sum_plagiarism_percent, 0.6)
+
+        result = pycode_similar.detect([s2, s1], module_level=True)
+        sum_plagiarism_percent, *tail = pycode_similar.summarize(result[0][1])
+        # s2.__main__ vs s1.main
+        self.assertGreater(sum_plagiarism_percent, 0.85)
+
+    def test_keep_prints(self):
+        s1 = """
+a = []
+for j in range(10):
+    for i in range(10):
+        a.append(i - j)
+print(a)
+print(abs(el) * el for el in a if abs(el) > 2)
+"""
+        s2 = """
+a = [
+    i - j
+    for j in range(10)
+    for i in range(10)
+]
+print(a)
+print(abs(el) * el for el in a if abs(el) > 2)
+"""
+
+        result = pycode_similar.detect([s1, s2], module_level=True, keep_prints=False)
+        self.assertLess(result[0][1][0].plagiarism_percent, 0.2)
+
+        result = pycode_similar.detect([s1, s2], module_level=True, keep_prints=True)
+        self.assertGreater(result[0][1][0].plagiarism_percent, 0.5)
+
 
 if __name__ == "__main__":
     #     import sys;sys.argv = ['', 'Test.test_reload_custom_code_after_changes_in_class']

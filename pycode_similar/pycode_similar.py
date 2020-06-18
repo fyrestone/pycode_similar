@@ -572,7 +572,7 @@ def summarize(func_ast_diff_list):
     if sum_total_count == 0:
         sum_plagiarism_percent = 0
     else:
-        sum_plagiarism_percent = sum_plagiarism_count / float(sum_total_count) * 100
+        sum_plagiarism_percent = sum_plagiarism_count / float(sum_total_count)
     return sum_plagiarism_percent, sum_plagiarism_count, sum_total_count
 
 
@@ -625,7 +625,7 @@ def main():
         print('candidate: {}'.format(pycode_list[index][0]))
         sum_plagiarism_percent, sum_plagiarism_count, sum_total_count = summarize(func_ast_diff_list)
         print('{:.2f} % ({}/{}) of ref code structure is plagiarized by candidate.'.format(
-            sum_plagiarism_percent,
+            sum_plagiarism_percent * 100,
             sum_plagiarism_count,
             sum_total_count,
         ))
