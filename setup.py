@@ -4,10 +4,6 @@ dic = {}
 exec(open('pycode_similar/pycode_similar.py').read(), dic)
 VERSION = dic['__version__']
 
-
-
-
-
 if __name__ == '__main__':
     setup(name='pycode_similar',
           version=VERSION,
