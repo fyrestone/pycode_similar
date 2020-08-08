@@ -36,7 +36,7 @@ Just use it as a standard command line tool if pip install properly.
 .. code-block:: text
 
 	$ pycode_similar
-	usage: pycode_similar [-h] [-l L] [-p P] files files
+	usage: pycode_similar [-h] [-l L] [-p P] [-k] [-m] files files
 
 	A simple plagiarism detection tool for python code
 
@@ -44,20 +44,20 @@ Just use it as a standard command line tool if pip install properly.
 	  files       the input files
 
 	optional arguments:
-	  -h, --help  show this help message and exit
-	  -l L        if AST line of the function >= value then output detail
-	              (default: 4)
-	  -p P        if plagiarism percentage of the function >= value then output
-	              detail (default: 0.5)
+	  -h, --help          show this help message and exit
+	  -l L                if AST line of the function >= value then output detail (default: 4)
+	  -p P                if plagiarism percentage of the function >= value then output detail (default: 0.5)
+	  -k, --keep-prints   keep print nodes
+	  -m, --module-level  process module level nodes
 
 	pycode_similar: error: too few arguments
-	
+
 Of course, you can use it as a python library, too.
 
 .. code-block:: python
 
 	import pycode_similar
-	pycode_similar.detect([referenced_code_str, candidate_code_str1, candidate_code_str2, ...], diff_method=pycode_similar.UnifiedDiff)
+	pycode_similar.detect([referenced_code_str, candidate_code_str1, candidate_code_str2, ...], diff_method=pycode_similar.UnifiedDiff, keep_prints=False, module_level=False)
 	
 	
 Implementation
