@@ -49,6 +49,8 @@ Just use it as a standard command line tool if pip install properly.
 	  -p P                if plagiarism percentage of the function >= value then output detail (default: 0.5)
 	  -k, --keep-prints   keep print nodes
 	  -m, --module-level  process module level nodes
+	  -c, --continue-on-error
+	                      Continue on AST parsing error for candidate files. Reference code must be syntactically correct.
 
 	pycode_similar: error: too few arguments
 
@@ -58,8 +60,8 @@ Of course, you can use it as a python library, too.
 
 	import pycode_similar
 	pycode_similar.detect([referenced_code_str, candidate_code_str1, candidate_code_str2, ...], diff_method=pycode_similar.UnifiedDiff, keep_prints=False, module_level=False)
-	
-	
+
+
 Implementation
 --------------
 This tool has implemented two diff methods: line based diff(UnifiedDiff) and tree edit distance based diff(TreeDiff), both of them are run in function AST level.
@@ -75,7 +77,7 @@ Testing
 If you have the source code you can run the tests with
 
  `$ python pycode_similar/tests/test_cases.py`
- 
+
 Or perform
 
 .. code-block:: text
@@ -109,7 +111,7 @@ Or perform
 	0.92: ref FuncNodeCollector.__init__<18:4>, candidate FuncNodeCollector.__init__<20:4>
 	0.92: ref FuncNodeCollector.visit_Compare<108:4>, candidate FuncNodeCollector._simple_nomalize<117:8>
 	0.89: ref FuncNodeCollector.visit_Expr<79:4>, candidate FuncNodeCollector.visit_Expr<83:4>
-	
+
 Click `here  <https://github.com/fyrestone/pycode_similar/commit/149182beee460cbaf21d0995aa442a079ddf1fa9#diff-a30b425e81348c978616747430632fa8>`_
 to view this diff -> `0.92: ref FuncNodeCollector.visit_Compare<108:4>, candidate FuncNodeCollector._simple_nomalize<117:8>`
 
@@ -119,4 +121,4 @@ Repository
 The project is hosted on GitHub. You can look at the source here:
 
  https://github.com/fyrestone/pycode_similar
- 
+
