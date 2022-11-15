@@ -497,14 +497,13 @@ def detect(pycode_string_list, diff_method=UnifiedDiff, keep_prints=False, modul
             root_node = ast.parse(code_str)
         except SyntaxError as e:
             if continue_on_error and index != 0:
-                # print('warn: Can not parse code to AST, index = {}'.format(index))
                 func_info_list.append((index, None))
                 continue
             elif continue_on_error and index == 0:
                 print('Error: Can not parse reference code to AST, can not continue.')
-                raise AstParsingException(index)
+                raise AstParsingException(index) from e
             else:
-                raise AstParsingException(index)
+                raise AstParsingException(index) from e
         collector = FuncNodeCollector(keep_prints=keep_prints)
         collector.visit(root_node)
         code_utf8_lines = code_str.splitlines(True)
@@ -522,13 +521,13 @@ def detect(pycode_string_list, diff_method=UnifiedDiff, keep_prints=False, modul
     ast_diff_result = []
     index_ref, func_info_ref = func_info_list[0]
 
-    if func_info_ref != None and len(func_info_ref) == 0:
+    if func_info_ref is not None and len(func_info_ref) == 0:
         raise NoFuncException(index_ref)
 
     for index_candidate, func_info_candidate in func_info_list[1:]:
         func_ast_diff_list = []
 
-        if func_info_candidate == None: # AST not parsed
+        if func_info_candidate is None: # AST not parsed
             ast_error_func_diff_info = FuncDiffInfo()
             ast_error_func_diff_info.info_ref = None
             ast_error_func_diff_info.info_candidate = None
