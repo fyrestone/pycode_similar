@@ -36,10 +36,8 @@ class BaseNodeNormalizer(ast.NodeTransformer):
     def _mark_docstring_sub_nodes(node):
         """
         Inspired by ast.get_docstring, mark all docstring sub nodes.
-
         Case1:
         regular docstring of function/class/module
-
         Case2:
         def foo(self):
             '''pure string expression'''
@@ -49,7 +47,6 @@ class BaseNodeNormalizer(ast.NodeTransformer):
             if self.abc:
                 '''pure string expression'''
                 pass
-
         Case3:
         def foo(self):
             if self.abc:
@@ -57,7 +54,6 @@ class BaseNodeNormalizer(ast.NodeTransformer):
             else:
                 '''pure string expression'''
                 pass
-
         :param node: every ast node
         :return:
         """
@@ -241,12 +237,9 @@ class FuncNodeCollector(BaseNodeNormalizer):
 class FuncInfo(object):
     """
     Part of the astor library for Python AST manipulation.
-
     License: 3-clause BSD
-
     Copyright 2012 (c) Patrick Maupin
     Copyright 2013 (c) Berker Peksag
-
     """
 
     class NonExistent(object):
@@ -322,16 +315,13 @@ class FuncInfo(object):
     @staticmethod
     def _iter_node(node, name='', missing=NonExistent):
         """Iterates over an object:
-
            - If the object has a _fields attribute,
              it gets attributes in the order of this
              and returns name, value pairs.
-
            - Otherwise, if the object is a list instance,
              it returns name, value pairs for each item
              in the list, where the name is passed into
              this function (defaults to blank).
-
         """
         fields = getattr(node, '_fields', None)
         if fields is not None:
@@ -347,10 +337,8 @@ class FuncInfo(object):
     def _dump(node, name=None, initial_indent='', indentation='    ',
               maxline=120, maxmerged=80, special=ast.AST):
         """Dumps an AST or similar structure:
-
            - Pretty-prints with indentation
            - Doesn't print line/column/ctx info
-
         """
 
         def _inner_dump(node, name=None, indent=''):
@@ -398,6 +386,7 @@ class FuncDiffInfo(object):
     info_candidate = None
     plagiarism_count = 0
     total_count = 0
+    ast_parsing_error = False
 
     @property
     def plagiarism_percent(self):
@@ -492,14 +481,29 @@ class NoFuncException(Exception):
         super(NoFuncException, self).__init__('Can not find any functions from code, index = {}'.format(source))
         self.source = source
 
+class AstParsingException(Exception):
+    def __int__(self, source):
+        super(AstParsingException, self).__init__('Can not parse code to AST, index = {}'.format(source))
+        self.source = source
 
-def detect(pycode_string_list, diff_method=UnifiedDiff, keep_prints=False, module_level=False):
+
+def detect(pycode_string_list, diff_method=UnifiedDiff, keep_prints=False, module_level=False, continue_on_error=False):
     if len(pycode_string_list) < 2:
         return []
 
     func_info_list = []
     for index, code_str in enumerate(pycode_string_list):
-        root_node = ast.parse(code_str)
+        try:
+            root_node = ast.parse(code_str)
+        except SyntaxError as e:
+            if continue_on_error and index != 0:
+                func_info_list.append((index, None))
+                continue
+            elif continue_on_error and index == 0:
+                print('Error: Can not parse reference code to AST, can not continue.')
+                raise AstParsingException(index) from e
+            else:
+                raise AstParsingException(index) from e
         collector = FuncNodeCollector(keep_prints=keep_prints)
         collector.visit(root_node)
         code_utf8_lines = code_str.splitlines(True)
@@ -516,11 +520,22 @@ def detect(pycode_string_list, diff_method=UnifiedDiff, keep_prints=False, modul
 
     ast_diff_result = []
     index_ref, func_info_ref = func_info_list[0]
-    if len(func_info_ref) == 0:
+
+    if func_info_ref is not None and len(func_info_ref) == 0:
         raise NoFuncException(index_ref)
 
     for index_candidate, func_info_candidate in func_info_list[1:]:
         func_ast_diff_list = []
+
+        if func_info_candidate is None: # AST not parsed
+            ast_error_func_diff_info = FuncDiffInfo()
+            ast_error_func_diff_info.info_ref = None
+            ast_error_func_diff_info.info_candidate = None
+            ast_error_func_diff_info.ast_parsing_error = True
+            ast_error_func_diff_info.plagiarism_count = -1
+            ast_error_func_diff_info.total_count = 1
+            ast_diff_result.append((index_candidate, [ast_error_func_diff_info]))
+            continue
 
         for fi1 in func_info_ref:
             min_diff_value = int((1 << 31) - 1)
@@ -598,8 +613,8 @@ def main():
         return open(value, 'rb')
 
     parser = ArgParser(description='A simple plagiarism detection tool for python code')
-    parser.add_argument('files', type=get_file, nargs=2,
-                        help='the input files')
+    parser.add_argument('files', type=get_file, nargs='+',
+                        help='the input files. First file being the reference file.')
     parser.add_argument('-l', type=check_line_limit, default=4,
                         help='if AST line of the function >= value then output detail (default: 4)')
     parser.add_argument('-p', type=check_percentage_limit, default=0.5,
@@ -608,6 +623,8 @@ def main():
                         help='keep print nodes')
     parser.add_argument('-m', '--module-level', action='store_true', default=False,
                         help='process module level nodes')
+    parser.add_argument('-c', '--continue-on-error', action='store_true', default=False,
+                        help='Continue on AST parsing error for candidate files. Reference code must be syntactically correct.')
     args = parser.parse_args()
     pycode_list = [(f.name, f.read()) for f in args.files]
     try:
@@ -615,6 +632,7 @@ def main():
             [c[1] for c in pycode_list],
             keep_prints=args.keep_prints,
             module_level=args.module_level,
+            continue_on_error=args.continue_on_error
         )
     except NoFuncException as ex:
         print('error: can not find functions from {}.'.format(pycode_list[ex.source][0]))
@@ -635,6 +653,9 @@ def main():
         ))
         output_count = 0
         for func_diff_info in func_ast_diff_list:
+            if func_diff_info.ast_parsing_error:
+                print('ERR : ast parsing error for candidate file')
+                continue
             if len(func_diff_info.info_ref.func_ast_lines) >= args.l and func_diff_info.plagiarism_percent >= args.p:
                 output_count = output_count + 1
                 print(func_diff_info)

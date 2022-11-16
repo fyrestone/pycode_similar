@@ -20,7 +20,7 @@ def foo(a):
 class A(object):
     def __init__(self, a):
         self._a = a
-        
+
     def bar(self):
         if self._a > 2:
             return True
@@ -101,8 +101,8 @@ def foo(a):
     \"""
     if a >= 1:
         return True
-        
-    # this should return False    
+
+    # this should return False
     return False
             """
         s2 = """
@@ -233,6 +233,33 @@ print(abs(el) * el for el in a if abs(el) > 2)
 
         result = pycode_similar.detect([s1, s2], module_level=True, keep_prints=True)
         self.assertGreater(result[0][1][0].plagiarism_percent, 0.5)
+
+    def test_syntax_error(self):
+        s1 = """
+def main():
+    s = 0
+    for j in range(10):
+        for i in range(10):
+            if i > j:
+                s += i + j
+    print(s)
+
+if __name__ == '__main__':
+    main()
+"""
+        s2 = """
+s = 0
+for j in range(10):
+    for i in range(10):
+        if i > j:
+            s += i + j
+print(s)?
+"""
+        result = pycode_similar.detect([s1, s2], module_level=True, continue_on_error=True)
+        self.assertEqual(result[0][1][0].ast_parsing_error, True)
+
+        with self.assertRaises(pycode_similar.AstParsingException) as context:
+            result = pycode_similar.detect([s1, s2], module_level=True, continue_on_error=False)
 
 
 if __name__ == "__main__":
